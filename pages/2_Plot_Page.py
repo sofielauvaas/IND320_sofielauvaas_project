@@ -7,7 +7,7 @@ st.title("📈 Plot Page")
 # --- Load CSV with caching ---
 @st.cache_data
 def load_data():
-    df = pd.read_csv("open-meteo-subset.csv")
+    df = pd.read_csv("data/open-meteo-subset.csv")
     # Try parsing first column as datetime (if it looks like time data)
     try:
         df[df.columns[0]] = pd.to_datetime(df[df.columns[0]], errors="coerce")
