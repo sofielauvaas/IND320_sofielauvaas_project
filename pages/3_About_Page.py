@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.title("ℹ️ About This Project")
+st.title("About This Project")
 
 st.markdown("""
 This project was developed for the IND320 - Data to Decision course. 
