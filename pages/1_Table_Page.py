@@ -6,7 +6,7 @@ st.title("📊 Data Table")
 # Load CSV
 @st.cache_data
 def load_data():
-    return pd.read_csv("data/open-meteo-subset.csv")
+    return pd.read_csv("open-meteo-subset.csv")
 
 df = load_data()
 

@@ -12,7 +12,7 @@ Use the sidebar to navigate to different pages.
 """)
 
 # Quick preview of CSV if it exists
-data_path = "data/open-meteo-subset.csv"
+data_path = "open-meteo-subset.csv"
 
 if not os.path.exists(data_path):
     st.error("CSV file not found! Please put `open-meteo-subset.csv` in the project folder.")
