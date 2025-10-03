@@ -1,6 +1,6 @@
 # IND320 — Sofie Lauvaas Project
 
-Course project for IND320 (Data to Decision) at the Norwegian University of Life Sciences (NMBU).
+Course project for IND320 (Data to Decision) at the NMBU.
 
 This project explores a weather dataset using Python, Pandas, and Streamlit.  
 It includes both a Jupyter Notebook for exploration and a multi-page interactive Streamlit app.
