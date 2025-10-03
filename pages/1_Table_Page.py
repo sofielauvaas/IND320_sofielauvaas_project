@@ -6,7 +6,7 @@ st.title("Data Table")
 # Load CSV
 @st.cache_data
 def load_data():
-    df = pd.read_csv("open-meteo-subset.csv")
+    df = pd.read_csv("data/open-meteo-subset.csv")
     df["time"] = pd.to_datetime(df["time"])
     return df
 

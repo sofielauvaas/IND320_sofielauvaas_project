@@ -7,5 +7,4 @@
 # Ignore Python caches
 __pycache__/
 
-# Ignore local CSV if large / optional
-data/*.csv
+
