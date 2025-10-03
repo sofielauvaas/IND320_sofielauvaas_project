@@ -17,7 +17,13 @@ The app reads the local CSV file `data/open-meteo-subset.csv` and uses caching f
 
 ## How to run
 
-git clone https://github.com/sofielauvaas/IND320_sofielauvaas_project.git
-cd IND320_sofielauvaas_project
-pip install -r requirements.txt
-streamlit run streamlit_app.py
+- Checkout the  deployed application: https://ind320sofielauvaasproject.streamlit.app/
+
+- Download the project:
+
+    - git clone https://github.com/sofielauvaas/IND320_sofielauvaas_project.git
+    - cd IND320_sofielauvaas_project
+    - pip install -r requirements.txt
+    - streamlit run streamlit_app.py
+
+
