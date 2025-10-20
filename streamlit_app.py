@@ -10,4 +10,4 @@ Use the sidebar to navigate to different pages.
 """)
 
 # Display the image at the bottom
-st.image("home_page.png", use_container_width=True)
+st.image("data/home_page.png", use_container_width=True)

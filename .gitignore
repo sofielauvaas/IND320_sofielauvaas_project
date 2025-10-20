@@ -7,4 +7,7 @@
 # Ignore Python caches
 __pycache__/
 
+# Don't sync folder No_sync
+No_sync/
+
 

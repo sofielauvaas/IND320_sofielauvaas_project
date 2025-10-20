@@ -1,3 +1,7 @@
-streamlit>=1.25
-pandas>=2.0
-matplotlib>=3.8
+streamlit
+pandas
+pyspark
+cassandra-driver
+pymongo
+requests
+matplotlib
