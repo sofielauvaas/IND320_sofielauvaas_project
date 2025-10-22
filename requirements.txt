@@ -1,7 +1,5 @@
 streamlit
 pandas
-pyspark
-cassandra-driver
 pymongo
 requests
 matplotlib
