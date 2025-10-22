@@ -4,3 +4,4 @@ pymongo
 requests
 matplotlib
 plotly
+numpy
