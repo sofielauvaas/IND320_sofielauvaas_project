@@ -4,4 +4,3 @@ pymongo
 requests
 matplotlib
 plotly
-tomllib
