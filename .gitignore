@@ -6,8 +6,11 @@
 
 # Ignore Python caches
 __pycache__/
+*.pyc
 
 # Don't sync folder No_sync
 No_sync/
 
+# Streamlit secrets
+.streamlit/secrets.toml
 

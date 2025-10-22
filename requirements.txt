@@ -5,3 +5,5 @@ cassandra-driver
 pymongo
 requests
 matplotlib
+plotly
+tomllib

@@ -2,18 +2,29 @@
 
 Course project for IND320 (Data to Decision) at the NMBU.
 
-This project explores a weather dataset using Python, Pandas, and Streamlit.  
-It includes both a Jupyter Notebook for exploration and a multi-page interactive Streamlit app.
+This is an expanding project currently built in two main parts:
 
-## Streamlit App
+### Part 1: Initial Setup and CSV Visualization
+The project began with a focus on local data analysis (CSV weather data) to build the core **Streamlit app structure** and practice interactive visualizations.
 
-The app has four pages:
+### Part 2: Data Pipeline Development
+This stage implements a full **ETL (Extract, Transform, Load) pipeline**:
+1.  **Extract** data from the **Elhub API**.
+2.  **Process** the data using **Apache Spark** and **Cassandra**.
+3.  **Load** the final, clean data into **MongoDB**.
+4.  **Visualize** the final data in the Streamlit app's new pages.
+
+---
+
+## Streamlit App Pages
+
+The app contains pages from both project parts:
 1. **Home** — Introduction and overview.  
-2. **Data Table** — Shows the CSV table and first-month summary with sparklines.  
+2. **Data Table** — Shows the CSV table and first-month summary.  
 3. **Plot** — Interactive plots with column selection and month-range filtering.  
-4. **About** — Project details.
+4. **MongoDB Page** - Verification of the pipeline
 
-The app reads the local CSV file `data/open-meteo-subset.csv` and uses caching for faster performance.
+---
 
 ## How to run
 
@@ -25,5 +36,3 @@ The app reads the local CSV file `data/open-meteo-subset.csv` and uses caching f
     - cd IND320_sofielauvaas_project
     - pip install -r requirements.txt
     - streamlit run streamlit_app.py
-
-
