@@ -11,5 +11,5 @@ scikit-learn
 # Pin these networking libraries for stability
 requests>=2.31.0
 requests-cache>=1.1.0
-retry-requests==1.0.0 
+retry-requests>=1.0.4
 openmeteo-requests>=1.1.0
