@@ -1,11 +1,8 @@
 import streamlit as st
-# Import your custom control function and supporting utilities
 from utilities.app_state import render_app_state_controls
 from utilities import functions
 import pandas as pd
 import plotly.express as px
-# NOTE: We assume 'functions.plot_spectrogram_elhub' exists and returns a Matplotlib figure,
-# based on the original code's st.pyplot() usage and the function names you provided previously.
 
 st.set_page_config(page_title="Energy Time Series Analysis", layout="wide")
 
@@ -37,11 +34,10 @@ if df_production.empty:
     st.stop()
 
 # --- FILTERING LOGIC & CONTEXT DISPLAY ---
-
-# The options for analysis are now determined by the global production group selection
+# Use the globally selected groups for analysis
 analysis_options = globally_selected_groups
 
-# Display the globally selected groups and area for context (Replacing st.subheader)
+# Display the globally selected groups and area for context
 groups_text = ', '.join([g.capitalize() for g in analysis_options])
 st.info(
     f"""
@@ -57,7 +53,7 @@ st.info(
 # Selector for the single group required for STL/Spectrogram
 st.markdown("##### Select Production Group for Detailed Analysis:")
 selected_group_for_analysis = st.selectbox(
-    "Group:", # Simple label
+    "Group:",
     analysis_options,
     index=0,
     label_visibility="collapsed" # Hide label to keep it clean
@@ -82,7 +78,7 @@ with tab1:
     
     try:
         fig_stl = functions.stl_decomposition_elhub(
-            df_production, # Pass full data for internal filtering flexibility
+            df_production,
             price_area=price_area, 
             production_group=selected_group_for_analysis,
             period=period,
@@ -107,7 +103,6 @@ with tab2:
         st.caption("Number of overlapping samples between segments.")
 
     try:
-        # Assuming functions.create_spectrogram is the correct name and returns a Matplotlib figure
         fig_spec = functions.create_spectrogram( 
             df_production, 
             price_area=price_area, 

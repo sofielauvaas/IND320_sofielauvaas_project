@@ -1,10 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-# Import your custom control function
 from utilities.app_state import render_app_state_controls
-from utilities import functions # This now holds all analysis functions
-import requests # Needed for exception handling
+from utilities import functions
+import requests
 
 
 st.set_page_config(
@@ -20,17 +19,15 @@ with st.sidebar:
 
 # Use the canonical key for the Price Area
 selected_area = st.session_state.get('price_area')
-# REMOVED: selected_groups = st.session_state.get('production_group', ['No groups selected']) 
 
 if not selected_area:
     st.info("The global Price Area selector is not yet initialized. Please use the sidebar.")
     st.stop() 
 
-# REMOVED: groups_text = ', '.join([g.capitalize() for g in selected_groups])
 
 st.title("Anomaly and Outlier Detection")
 
-# --- DISPLAY CONTEXT BOX (REVISED TEXT: Only Price Area) ---
+# --- DISPLAY CONTEXT BOX ---
 st.info(
     f"""
     **Analysis Scope** (by the sidebar configuration):
@@ -38,11 +35,10 @@ st.info(
     * **Price Area:** **{selected_area}** 
     """
 )
-# -----------------------------------------------------------
 
-# Load data using the cached API function (Layer 1 Caching)
+
+# Load data using the cached API function
 try:
-    # Ensure functions.download_weather_data uses the correct mechanism to fetch data
     df = functions.download_weather_data(selected_area) 
     
     if df is None or df.empty:
@@ -66,7 +62,7 @@ with tab1:
     st.header("Temperature Outlier Analysis (Robust SPC)")
     st.caption("Robust Statistical Process Control (SPC) based on Seasonal-Adjusted Time Variation (SATV) using DCT filtering.")
 
-    # SLIDERS for SPC Analysis
+    # Sliders for SPC Analysis
     col_a, col_b = st.columns(2)
     with col_a:
         freq_cutoff = st.slider(
@@ -81,11 +77,9 @@ with tab1:
         num_std = st.slider("Number of Robust Standard Deviations (k)", min_value=2.0, max_value=5.0, value=3.0, step=0.1, help="Defines the control limits (Center ± k * Robust Std. Dev.).")
 
     if 'temperature_2m' in df_ready.columns:
-        # --- CALL FUNCTION FROM functions.py ---
         fig, summary = functions.temperature_spc_from_satv(
             df_ready["time"].values,
             df_ready["temperature_2m"].values,
-            # Use the correct keyword argument 'keep_low_index'
             keep_low_index=freq_cutoff, 
             k=num_std
         )
@@ -104,7 +98,7 @@ with tab2:
     st.header("Anomaly Detection (Local Outlier Factor - LOF)")
     st.caption("LOF detects local density deviations, useful for identifying short-lived, isolated anomalies.")
 
-    # RADIO BUTTON and SLIDERS for LOF Analysis
+    # Radio button and sliders for LOF Analysis
     selected_variable = st.radio("Select Variable for LOF Analysis", 
                                 ["precipitation", "wind_speed_10m", "wind_gusts_10m"])
 
@@ -115,7 +109,6 @@ with tab2:
         n_neighbors = st.slider("Number of Neighbors (n_neighbors)", min_value=5, max_value=50, value=20, step=1, help="Number of neighbors used to calculate local density.")
 
     if selected_variable in df_ready.columns:
-        # --- CALL FUNCTION FROM functions.py ---
         fig, summary = functions.precipitation_lof_plot( 
             df_ready["time"].values,
             df_ready[selected_variable], 

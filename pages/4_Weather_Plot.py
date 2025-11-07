@@ -3,16 +3,15 @@ import pandas as pd
 import numpy as np 
 import requests 
 import plotly.graph_objects as go
-# Import your custom control function
 from utilities.app_state import render_app_state_controls
-from utilities import functions # Import your helper functions
+from utilities import functions
 
 st.set_page_config(
     page_title="Weather Data Analysis",
     layout="wide"
 )
 
-# --- GLOBAL CONFIGURATION (Keep this section) ---
+# --- GLOBAL CONFIGURATION ---
 WIND_DIRECTION_COL = "wind_direction_10m"
 WIND_ARROW_COLOR = '#128264' 
 COLOR_MAP = {
@@ -21,7 +20,7 @@ COLOR_MAP = {
 }
 LINE_COLORS = list(COLOR_MAP.values()) 
 
-# --- CACHED DATA PREPARATION & LOADING (Keep this section) ---
+# --- CACHED DATA PREPARATION & LOADING ---
 @st.cache_data(show_spinner=False)
 def prepare_data_subset(df, selected_months_num):
     start_month, end_month = selected_months_num
@@ -30,22 +29,16 @@ def prepare_data_subset(df, selected_months_num):
 
 @st.cache_data(show_spinner="Downloading weather data...")
 def load_weather_data_local(area):
-    # Ensure this function correctly maps the area name (e.g., 'NO1') to coordinates
     return functions.download_weather_data(area)
 
 
-# --------------------------------------------------------------------------
-# --- START OF MAIN PAGE EXECUTION ---
-# --------------------------------------------------------------------------
 
 # --- 1. RENDER GLOBAL CONTROLS IN SIDEBAR ---
 with st.sidebar:
     render_app_state_controls()
 
 # --- 2. ACCESS GLOBAL STATE ---
-# Use the canonical key for the Price Area
 selected_area = st.session_state.get('price_area')
-# REMOVED: selected_groups = st.session_state.get('production_group', ['No groups selected']) 
 
 if not selected_area:
     st.info("The global Price Area selector is not yet initialized. Please use the sidebar.")
@@ -53,7 +46,7 @@ if not selected_area:
 
 st.title("Weather Data Visualisation")
 
-# --- DISPLAY CONTEXT BOX (REVISED TEXT: Only Price Area) ---
+# --- DISPLAY CONTEXT BOX ---
 st.info(
     f"""
     **Analysis Scope** (by the sidebar configuration):
@@ -61,7 +54,6 @@ st.info(
     * **Weather Location (Price Area):** **{selected_area}**
     """
 )
-# -------------------------------------------
 
 
 try:
@@ -74,7 +66,7 @@ except Exception as e:
     st.stop() 
 
 
-# --- WIDGETS AND DYNAMIC DATA PROCESSING (Logic remains the same) ---
+# --- WIDGETS AND DYNAMIC DATA PROCESSING ---
 columns = list(df_raw.columns.drop(WIND_DIRECTION_COL, errors='ignore'))
 selected_col = st.selectbox("Select a column", ["All columns"] + columns)
 
@@ -114,7 +106,7 @@ month_names_list = subset_indexed.index.strftime("%B").to_list()
 first_month_name = month_names_list[0] 
 last_month_name = month_names_list[-1]
 
-# --- PLOTTING LOGIC (Logic remains the same) ---
+# --- PLOTTING LOGIC ---
 
 fig = go.Figure()
 
@@ -153,7 +145,7 @@ time_span = df_plot['time'].iloc[-1] - df_plot['time'].iloc[0]
 FIXED_TIME_OFFSET_MAGNITUDE = time_span * 0.01 
 
 
-# 3. Add Arrows showing Wind Direction (FIXED LOGIC)
+# 3. Add Arrows showing Wind Direction 
 if WIND_DIRECTION_COL in df_plot.columns and (selected_col == "All columns" or selected_col == WIND_DIRECTION_COL):
     
     for i in range(0, len(df_plot), arrow_every):

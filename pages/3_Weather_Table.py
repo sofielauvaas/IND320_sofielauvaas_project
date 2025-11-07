@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-# Import your custom control function
 from utilities.app_state import render_app_state_controls 
-from utilities import functions # Import the helper functions file
-import requests # Needed for API exception handling
+from utilities import functions
+import requests
 
 st.set_page_config(
     page_title="Weather Table with Line Charts",
@@ -16,8 +15,8 @@ with st.sidebar:
 
 # --- 2. ACCESS GLOBAL STATE ---
 # Get the globally selected area (used for weather data source)
-selected_area = st.session_state.get('price_area') # Use the canonical key
-# REMOVED: selected_groups = st.session_state.get('production_group', ['No groups selected']) 
+selected_area = st.session_state.get('price_area')
+
 
 # --- INITIAL CHECKS ---
 if not selected_area:
@@ -26,7 +25,7 @@ if not selected_area:
 
 st.title("Weather Data Summary")
 
-# --- DISPLAY CONTEXT BOX (REVISED TEXT: Only Price Area) ---
+# --- DISPLAY CONTEXT BOX ---
 st.info(
     f"""
     **Analysis Scope** (by the sidebar configuration):
@@ -34,7 +33,6 @@ st.info(
     * **Weather Location (Price Area):** **{selected_area}**
     """
 )
-# ----------------------------------------------------
 
 
 try:
@@ -61,7 +59,7 @@ except Exception as e:
 df_display = df.reset_index()
 
 
-# Identify the first month's data (assuming the first month is the default view)
+# Identify the first month's data
 first_month_num = df_display['time'].dt.month.min()
 first_month_name = pd.to_datetime(f'2021-{first_month_num}-01').strftime('%B')
 first_month = df[df.index.month == first_month_num]
@@ -76,7 +74,7 @@ for col in df.columns:
         
         row = {
             "Column": col,
-            f"{first_month_name} Trend": chart_data, # Dynamic column name for chart clarity
+            f"{first_month_name} Trend": chart_data,
             "Min": first_month[col].min(),
             "Max": first_month[col].max(),
             "Mean": first_month[col].mean().round(2),

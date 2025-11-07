@@ -25,7 +25,7 @@ TARGET_YEAR = 2021
 BASE_WEATHER_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 
-# Global Robust Client Setup (No Streamlit caching function, per request)
+# Global Robust Client Setup
 cache_session = requests_cache.CachedSession('.cache', expire_after=-1)
 retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
 openmeteo_client = openmeteo_requests.Client(session=retry_session) 
@@ -257,7 +257,7 @@ def create_spectrogram(
     ax.set_xlabel("Time [days]", fontsize=12)
     ax.set_ylabel("Frequency [cycles/day]", fontsize=12)
     
-    # Highlight key cycles on the new axis scale, including Bi-Daily (2.0 cycles/day)
+    # Highlight key cycles on the new axis scale
     ax.set_ylim(0, 5) 
     ax.set_yticks([1.0, 2.0, 1.0/7.0]) 
     ax.set_yticklabels([f'Daily Cycle (1.0)', f'Bi-Daily Cycle (2.0)', f'Weekly Cycle ({1/7:.2f})'])

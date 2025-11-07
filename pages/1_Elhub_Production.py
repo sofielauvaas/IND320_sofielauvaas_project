@@ -1,5 +1,4 @@
 import streamlit as st
-# FIX 1: Update import path to use your utilities folder
 from utilities import functions 
 import pandas as pd
 import plotly.express as px
@@ -46,7 +45,6 @@ with left_column:
         horizontal=True
     )
     
-    # FIX 2: Write the selected area to the CANONICAL GLOBAL STATE KEY
     st.session_state['price_area'] = selected_area
     
     area_data = df[df["pricearea"] == selected_area]
@@ -73,7 +71,7 @@ with right_column:
         "Select Month",
         MONTH_NAMES
     )
-    # Keeping this local state key is fine as it's only used on this page
+
     st.session_state['elhub_selected_month'] = selected_month_name
     
     selected_groups = st.pills(
@@ -83,7 +81,6 @@ with right_column:
         selection_mode="multi"
     )
     
-    # FIX 3: Write the selected groups to the CANONICAL GLOBAL STATE KEY
     st.session_state['production_group'] = selected_groups
     
     if not selected_groups:
