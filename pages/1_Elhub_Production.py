@@ -1,5 +1,6 @@
 import streamlit as st
-import functions 
+# FIX 1: Update import path to use your utilities folder
+from utilities import functions 
 import pandas as pd
 import plotly.express as px
 
@@ -28,7 +29,7 @@ COLOR_MAP = {
     'hydro': '#035397',
     'wind': '#128264', 
     'solar': '#f9c80e',
-    'thermal': '#546e7a', 
+    'thermal': '#546e7a',
     'other': '#9dc183'
 }
 
@@ -45,9 +46,8 @@ with left_column:
         horizontal=True
     )
     
-    # Save the selected area to session state for all dependent pages (weather and Elhub)
-    st.session_state['weather_source_area'] = selected_area
-    st.session_state['elhub_selected_area'] = selected_area
+    # FIX 2: Write the selected area to the CANONICAL GLOBAL STATE KEY
+    st.session_state['price_area'] = selected_area
     
     area_data = df[df["pricearea"] == selected_area]
     production_by_group = area_data.groupby("productiongroup")["quantitykwh"].sum().reset_index()
@@ -73,6 +73,7 @@ with right_column:
         "Select Month",
         MONTH_NAMES
     )
+    # Keeping this local state key is fine as it's only used on this page
     st.session_state['elhub_selected_month'] = selected_month_name
     
     selected_groups = st.pills(
@@ -81,7 +82,9 @@ with right_column:
         default=PRODUCTION_GROUPS,
         selection_mode="multi"
     )
-    st.session_state['elhub_selected_groups'] = selected_groups
+    
+    # FIX 3: Write the selected groups to the CANONICAL GLOBAL STATE KEY
+    st.session_state['production_group'] = selected_groups
     
     if not selected_groups:
         st.warning("Please select at least one production group.")

@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
-import functions # Import the helper functions file
+# Import your custom control function
+from utilities.app_state import render_app_state_controls 
+from utilities import functions # Import the helper functions file
 import requests # Needed for API exception handling
 
 st.set_page_config(
@@ -8,32 +10,35 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("Weather Data Summary")
+# --- 1. RENDER GLOBAL CONTROLS IN SIDEBAR ---
+with st.sidebar:
+    render_app_state_controls()
 
-# --- 1. CHECK SESSION STATE & FETCH DATA ---
+# --- 2. ACCESS GLOBAL STATE ---
+# Get the globally selected area (used for weather data source)
+selected_area = st.session_state.get('price_area') # Use the canonical key
+# REMOVED: selected_groups = st.session_state.get('production_group', ['No groups selected']) 
 
-if 'weather_source_area' not in st.session_state:
-    st.info("Please go back to the 'Elhub Production Data' page to select a Price Area first.")
+# --- INITIAL CHECKS ---
+if not selected_area:
+    st.info("The global Price Area selector is not yet initialized. Please use the sidebar.")
     st.stop() 
 
-# Get the selected area (used for weather data source)
-selected_area = st.session_state['weather_source_area']
-# Get the selected groups (used for context display)
-selected_groups = st.session_state.get('elhub_selected_groups', ['No groups selected']) 
+st.title("Weather Data Summary")
 
-# --- DISPLAY CONTEXT BOX (Replaces subheader) ---
-groups_text = ', '.join([g.capitalize() for g in selected_groups])
+# --- DISPLAY CONTEXT BOX (REVISED TEXT: Only Price Area) ---
 st.info(
     f"""
-    **Chosen parameters from Elhub Production Page:**
+    **Analysis Scope** (by the sidebar configuration):
     
-    * **Weather Location (Price Area):** {selected_area}
+    * **Weather Location (Price Area):** **{selected_area}**
     """
 )
+# ----------------------------------------------------
 
 
 try:
-    # This calls the fast, cached function from functions.py
+    # This calls the fast, cached function from functions.py. 
     df = functions.download_weather_data(selected_area) 
     
     if df is None:
@@ -56,21 +61,22 @@ except Exception as e:
 df_display = df.reset_index()
 
 
-
-# Identify the first month's data
+# Identify the first month's data (assuming the first month is the default view)
 first_month_num = df_display['time'].dt.month.min()
+first_month_name = pd.to_datetime(f'2021-{first_month_num}-01').strftime('%B')
 first_month = df[df.index.month == first_month_num]
 
 # Prepare a table: one row per numeric column
 table_data = []
 for col in df.columns: 
+    # Use the filtered data for the stats
     if pd.api.types.is_numeric_dtype(first_month[col]):
         
         chart_data = first_month[col].tolist()
         
         row = {
             "Column": col,
-            "First Month": chart_data, 
+            f"{first_month_name} Trend": chart_data, # Dynamic column name for chart clarity
             "Min": first_month[col].min(),
             "Max": first_month[col].max(),
             "Mean": first_month[col].mean().round(2),
@@ -83,8 +89,8 @@ df_table = pd.DataFrame(table_data)
 
 # Configure the LineChartColumn
 column_config = {
-    "First Month": st.column_config.LineChartColumn(
-        label="First Month Hourly Trend",
+    f"{first_month_name} Trend": st.column_config.LineChartColumn(
+        label=f"{first_month_name} Hourly Trend",
         width="medium"
     )
 }

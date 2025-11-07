@@ -1,75 +1,67 @@
 import streamlit as st
-import functions
+# Import your custom control function and supporting utilities
+from utilities.app_state import render_app_state_controls
+from utilities import functions
 import pandas as pd
 import plotly.express as px
+# NOTE: We assume 'functions.plot_spectrogram_elhub' exists and returns a Matplotlib figure,
+# based on the original code's st.pyplot() usage and the function names you provided previously.
 
 st.set_page_config(page_title="Energy Time Series Analysis", layout="wide")
+
+# --- 1. RENDER GLOBAL CONTROLS IN SIDEBAR ---
+with st.sidebar:
+    render_app_state_controls()
+
+# --- 2. ACCESS GLOBAL STATE ---
+# Read the globally selected price area and groups from session_state
+price_area = st.session_state.get("price_area")
+globally_selected_groups = st.session_state.get("production_group")
+
+# --- INITIAL CHECK ---
+if not price_area or not globally_selected_groups:
+    st.info("Please use the sidebar to select a Price Area and at least one Production Group.")
+    st.stop()
+
 st.title("Time Series Decomposition and Frequency Analysis")
 
-# --- DATA LOADING & DEPENDENCY CHECK ---
-
+# --- DATA LOADING ---
 try:
     df_production = functions.load_data_from_mongo()
 except Exception as e:
     st.error(f"Failed to load production data from MongoDB. Error: {e}")
     st.stop() 
 
-PRICE_AREAS = sorted(df_production["pricearea"].unique().tolist())
-PRODUCTION_GROUPS = sorted(df_production["productiongroup"].unique().tolist()) # All available groups
+if df_production.empty:
+    st.warning("No production data found in the MongoDB collection.")
+    st.stop()
 
-# Check session state for persistence and default if not set
-default_area = st.session_state.get('elhub_selected_area', PRICE_AREAS[0])
+# --- FILTERING LOGIC & CONTEXT DISPLAY ---
 
-# --- FETCH SELECTED GROUPS FROM PAGE 2 ---
-# Get the list of groups selected on the main Production Plot page
-selected_groups_from_page2 = st.session_state.get('elhub_selected_groups', PRODUCTION_GROUPS)
+# The options for analysis are now determined by the global production group selection
+analysis_options = globally_selected_groups
 
-# Filter the options for the selectbox based on the selection from Page 2
-if not selected_groups_from_page2:
-    st.warning("Please select at least one Production Group on the Elhub Production Data page.")
-    # Use all groups as a fallback, or stop the app. Using all as fallback is safer.
-    analysis_options = PRODUCTION_GROUPS
-else:
-    analysis_options = selected_groups_from_page2
-    
-groups_text = ', '.join([g.capitalize() for g in selected_groups_from_page2])
-
-# --- LOCAL SELECTORS (Define and Save Control) ---
-st.subheader("Analysis Parameters")
-
-col_area, col_group = st.columns(2)
-with col_area:
-    # Selector for the Price Area (can override the inherited choice)
-    price_area = st.selectbox(
-        "Select Price Area (Controls Weather Data Dependency):", 
-        PRICE_AREAS, 
-        index=PRICE_AREAS.index(default_area) if default_area in PRICE_AREAS else 0,
-        key='stl_price_area_selector'
-    ) 
-    
-    # Save the selected area back to the session state for all weather pages
-    st.session_state['weather_source_area'] = price_area 
-    st.session_state['elhub_selected_area'] = price_area
-    
-with col_group:
-    # Selector for the single group required for STL/Spectrogram
-    # FIX: Options are filtered to only those selected on Page 2
-    selected_group_for_analysis = st.selectbox(
-        "Select Single Production Group for Analysis:", 
-        analysis_options,
-        index=0
-    )
-
-# --- UPDATED CLARITY STATEMENT ---
+# Display the globally selected groups and area for context (Replacing st.subheader)
+groups_text = ', '.join([g.capitalize() for g in analysis_options])
 st.info(
     f"""
-    **Chosen parameters from Elhub Production Page:**
+    **Analysis Scope** (by the sidebar configuartion):
     
-    * **Price Area:** {price_area}
+    * **Price Area:** **{price_area}**
     * **Available Groups:** {groups_text}
     """
 )
 
+# --- LOCAL SELECTOR ---
+
+# Selector for the single group required for STL/Spectrogram
+st.markdown("##### Select Production Group for Detailed Analysis:")
+selected_group_for_analysis = st.selectbox(
+    "Group:", # Simple label
+    analysis_options,
+    index=0,
+    label_visibility="collapsed" # Hide label to keep it clean
+)
 
 # --- TABS AND ANALYSIS ---
 tab1, tab2 = st.tabs(["STL Decomposition", "Spectrogram"])
@@ -77,7 +69,7 @@ tab1, tab2 = st.tabs(["STL Decomposition", "Spectrogram"])
 
 # TAB 1: STL Decomposition
 with tab1:
-    st.subheader(f"STL Decomposition for {selected_group_for_analysis.capitalize()} Production in {price_area}")
+    st.markdown(f"#### STL Decomposition: {selected_group_for_analysis.capitalize()} in {price_area}")
     
     col_period, col_seasonal, col_trend = st.columns(3)
     with col_period:
@@ -89,9 +81,8 @@ with tab1:
     
     
     try:
-        # Call the function using consistent arguments: price_area and production_group
         fig_stl = functions.stl_decomposition_elhub(
-            df_production, 
+            df_production, # Pass full data for internal filtering flexibility
             price_area=price_area, 
             production_group=selected_group_for_analysis,
             period=period,
@@ -100,30 +91,30 @@ with tab1:
         )
         st.plotly_chart(fig_stl, use_container_width=True)
     except Exception as e:
-        st.error(f"Error during STL Decomposition. Please check parameters. Error: {e}")
+        st.error(f"Error during STL Decomposition. Please check parameters or data availability. Error: {e}")
 
 
 # TAB 2: Spectrogram Analysis
 with tab2:
-    st.subheader(f"Spectrogram of {selected_group_for_analysis.capitalize()} Production in {price_area}")
+    st.markdown(f"#### Spectrogram Analysis: {selected_group_for_analysis.capitalize()} in {price_area}")
     
     col_window, col_overlap = st.columns(2)
     with col_window:
-        window_length = st.slider("Window Length (NPERSEG)", min_value=64, max_value=512, value=256, step=64, key='spec_window')
+        window_length = st.slider("Window Length (NPERSEG - hours)", min_value=64, max_value=512, value=256, step=64, key='spec_window')
         st.caption("Length of each segment for analysis.")
     with col_overlap:
-        overlap = st.slider("Overlap (NOVERLAP)", min_value=32, max_value=256, value=128, step=32, key='spec_overlap')
-        st.caption("Number of samples overlapping between segments.")
+        overlap = st.slider("Overlap (NOVERLAP - hours)", min_value=32, max_value=256, value=128, step=32, key='spec_overlap')
+        st.caption("Number of overlapping samples between segments.")
 
     try:
-        # Call the function using consistent arguments: price_area and production_group
-        fig_spec = functions.create_spectrogram(
+        # Assuming functions.create_spectrogram is the correct name and returns a Matplotlib figure
+        fig_spec = functions.create_spectrogram( 
             df_production, 
             price_area=price_area, 
             production_group=selected_group_for_analysis,
             window_length=window_length,
             overlap=overlap
         )
-        st.pyplot(fig_spec, use_container_width=True) # Assuming create_spectrogram returns a Matplotlib figure
+        st.pyplot(fig_spec, use_container_width=True) 
     except Exception as e:
         st.error(f"Error during Spectrogram analysis. Error: {e}")

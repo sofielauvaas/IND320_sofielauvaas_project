@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import functions # This now holds all analysis functions
+# Import your custom control function
+from utilities.app_state import render_app_state_controls
+from utilities import functions # This now holds all analysis functions
 import requests # Needed for exception handling
 
 
@@ -10,28 +12,37 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("Anomaly and Outlier Detection")
+# --- 1. RENDER GLOBAL CONTROLS IN SIDEBAR ---
+with st.sidebar:
+    render_app_state_controls()
 
-# --- 1. CONTEXT AND DATA FETCHING ---
+# --- 2. ACCESS GLOBAL STATE AND DATA FETCHING ---
 
-if 'weather_source_area' not in st.session_state:
-    st.info("Please go back to the 'Elhub Production Data' page to select a Price Area first.")
+# Use the canonical key for the Price Area
+selected_area = st.session_state.get('price_area')
+# REMOVED: selected_groups = st.session_state.get('production_group', ['No groups selected']) 
+
+if not selected_area:
+    st.info("The global Price Area selector is not yet initialized. Please use the sidebar.")
     st.stop() 
 
-selected_area = st.session_state['weather_source_area']
-selected_groups = st.session_state.get('elhub_selected_groups', ['No groups selected']) 
-groups_text = ', '.join([g.capitalize() for g in selected_groups])
+# REMOVED: groups_text = ', '.join([g.capitalize() for g in selected_groups])
 
+st.title("Anomaly and Outlier Detection")
+
+# --- DISPLAY CONTEXT BOX (REVISED TEXT: Only Price Area) ---
 st.info(
     f"""
-    **Chosen parameters from Elhub Production Page:**
+    **Analysis Scope** (by the sidebar configuration):
     
-    * **Weather Location (Price Area):** {selected_area}
+    * **Price Area:** **{selected_area}** 
     """
 )
+# -----------------------------------------------------------
 
 # Load data using the cached API function (Layer 1 Caching)
 try:
+    # Ensure functions.download_weather_data uses the correct mechanism to fetch data
     df = functions.download_weather_data(selected_area) 
     
     if df is None or df.empty:
@@ -47,7 +58,7 @@ except Exception as e:
 df_ready = df.reset_index()
 
 
-# --- 2. TABBED INTERFACE ---
+# --- 3. TABBED INTERFACE ---
 
 tab1, tab2 = st.tabs(["Temperature Outliers (Robust SPC)", "Precipitation/Wind Anomalies (LOF)"])
 
@@ -58,7 +69,14 @@ with tab1:
     # SLIDERS for SPC Analysis
     col_a, col_b = st.columns(2)
     with col_a:
-        freq_cutoff = st.slider("DCT Low-Frequency Index Cutoff", min_value=1, max_value=250, value=100, step=1, help="Controls how much low-frequency trend is removed to isolate variation.")
+        freq_cutoff = st.slider(
+            "DCT Low-Frequency Index Cutoff", 
+            min_value=1, 
+            max_value=250, 
+            value=100, 
+            step=1, 
+            help="Controls how many low-frequency DCT indices are kept (smaller index = smoother trend, more variation isolated)."
+        )
     with col_b:
         num_std = st.slider("Number of Robust Standard Deviations (k)", min_value=2.0, max_value=5.0, value=3.0, step=0.1, help="Defines the control limits (Center ± k * Robust Std. Dev.).")
 
@@ -67,7 +85,8 @@ with tab1:
         fig, summary = functions.temperature_spc_from_satv(
             df_ready["time"].values,
             df_ready["temperature_2m"].values,
-            keep_low_index=freq_cutoff,
+            # Use the correct keyword argument 'keep_low_index'
+            keep_low_index=freq_cutoff, 
             k=num_std
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -96,15 +115,12 @@ with tab2:
         n_neighbors = st.slider("Number of Neighbors (n_neighbors)", min_value=5, max_value=50, value=20, step=1, help="Number of neighbors used to calculate local density.")
 
     if selected_variable in df_ready.columns:
-        variable_title = selected_variable.replace('_', ' ').title()
-        
         # --- CALL FUNCTION FROM functions.py ---
         fig, summary = functions.precipitation_lof_plot( 
             df_ready["time"].values,
             df_ready[selected_variable], 
             contamination=contamination,
             n_neighbors=n_neighbors,
-            variable_name=variable_title
             )
         st.plotly_chart(fig, use_container_width=True)
 

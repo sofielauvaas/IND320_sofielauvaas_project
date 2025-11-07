@@ -3,16 +3,16 @@ import pandas as pd
 import numpy as np 
 import requests 
 import plotly.graph_objects as go
-import functions # Import your helper functions
+# Import your custom control function
+from utilities.app_state import render_app_state_controls
+from utilities import functions # Import your helper functions
 
 st.set_page_config(
     page_title="Weather Data Analysis",
     layout="wide"
 )
 
-st.title("Weather Data Visualisation")
-
-# --- GLOBAL CONFIGURATION ---
+# --- GLOBAL CONFIGURATION (Keep this section) ---
 WIND_DIRECTION_COL = "wind_direction_10m"
 WIND_ARROW_COLOR = '#128264' 
 COLOR_MAP = {
@@ -21,7 +21,7 @@ COLOR_MAP = {
 }
 LINE_COLORS = list(COLOR_MAP.values()) 
 
-# --- CACHED DATA PREPARATION & LOADING (Remains the same) ---
+# --- CACHED DATA PREPARATION & LOADING (Keep this section) ---
 @st.cache_data(show_spinner=False)
 def prepare_data_subset(df, selected_months_num):
     start_month, end_month = selected_months_num
@@ -30,21 +30,39 @@ def prepare_data_subset(df, selected_months_num):
 
 @st.cache_data(show_spinner="Downloading weather data...")
 def load_weather_data_local(area):
+    # Ensure this function correctly maps the area name (e.g., 'NO1') to coordinates
     return functions.download_weather_data(area)
-
-
 
 
 # --------------------------------------------------------------------------
 # --- START OF MAIN PAGE EXECUTION ---
 # --------------------------------------------------------------------------
 
-if 'weather_source_area' not in st.session_state:
-    st.info("Please go back to the 'Elhub Production Data' page to select a Price Area first.")
+# --- 1. RENDER GLOBAL CONTROLS IN SIDEBAR ---
+with st.sidebar:
+    render_app_state_controls()
+
+# --- 2. ACCESS GLOBAL STATE ---
+# Use the canonical key for the Price Area
+selected_area = st.session_state.get('price_area')
+# REMOVED: selected_groups = st.session_state.get('production_group', ['No groups selected']) 
+
+if not selected_area:
+    st.info("The global Price Area selector is not yet initialized. Please use the sidebar.")
     st.stop() 
 
-selected_area = st.session_state['weather_source_area']
-st.info(f"**Weather Location (Price Area):** {selected_area}")
+st.title("Weather Data Visualisation")
+
+# --- DISPLAY CONTEXT BOX (REVISED TEXT: Only Price Area) ---
+st.info(
+    f"""
+    **Analysis Scope** (by the sidebar configuration):
+    
+    * **Weather Location (Price Area):** **{selected_area}**
+    """
+)
+# -------------------------------------------
+
 
 try:
     df_raw = load_weather_data_local(selected_area) 
@@ -56,7 +74,7 @@ except Exception as e:
     st.stop() 
 
 
-# --- WIDGETS AND DYNAMIC DATA PROCESSING ---
+# --- WIDGETS AND DYNAMIC DATA PROCESSING (Logic remains the same) ---
 columns = list(df_raw.columns.drop(WIND_DIRECTION_COL, errors='ignore'))
 selected_col = st.selectbox("Select a column", ["All columns"] + columns)
 
@@ -64,7 +82,7 @@ months = sorted(df_raw.index.month.unique())
 selected_months_num = st.select_slider(
     "Select month range (Data is for 2021)",
     options=months,
-    # FIX 1: Set default to first month only (January)
+    # Set default to first month only (January)
     value=(months[0], months[0]), 
     format_func=lambda x: pd.to_datetime(f"2023-{x}-01").strftime("%B")
 )
@@ -96,11 +114,11 @@ month_names_list = subset_indexed.index.strftime("%B").to_list()
 first_month_name = month_names_list[0] 
 last_month_name = month_names_list[-1]
 
-# --- PLOTTING LOGIC ---
+# --- PLOTTING LOGIC (Logic remains the same) ---
 
 fig = go.Figure()
 
-# 1. Plot Line Traces (Logic remains the same)
+# 1. Plot Line Traces
 if selected_col == "All columns":
     plot_cols = [c for c in df_plot.columns if c not in ["time", WIND_DIRECTION_COL]]
     for i, col in enumerate(plot_cols):
@@ -117,7 +135,6 @@ else:
 
 
 # 2. Arrow Parameters Calculation
-# Got inspired by peer Terese Ivesdal to implement this logic so see the wind direction over time, instead of a wind rose.
 numeric_cols_unnorm = subset_indexed.select_dtypes(include=[np.number]).columns.drop(WIND_DIRECTION_COL, errors="ignore")
 global_y_min = subset_indexed[numeric_cols_unnorm].min().min() if not numeric_cols_unnorm.empty else 0
 global_y_max = subset_indexed[numeric_cols_unnorm].max().max() if not numeric_cols_unnorm.empty else 10
@@ -130,7 +147,7 @@ arrow_every = max(1, len(df_plot) // 90)
 arrow_y = global_y_min - (global_y_max - global_y_min) * 0.1
 arrow_len = (global_y_max - global_y_min) * 0.1
 
-# FIX 2: Define a fixed, small time offset based on the displayed data duration
+# Define a fixed, small time offset based on the displayed data duration
 time_span = df_plot['time'].iloc[-1] - df_plot['time'].iloc[0]
 # Use 1% of the total displayed time span for the arrow's horizontal magnitude
 FIXED_TIME_OFFSET_MAGNITUDE = time_span * 0.01 
@@ -158,7 +175,7 @@ if WIND_DIRECTION_COL in df_plot.columns and (selected_col == "All columns" or s
         # Add annotation
         fig.add_annotation(
             x=t, y=arrow_y,
-            ax=arrow_x2, ay=arrow_y2, # **USES CORRECTED X-COORDINATE**
+            ax=arrow_x2, ay=arrow_y2, 
             xref="x", yref="y", axref="x", ayref="y",
             text="",
             showarrow=True, arrowhead=3, arrowsize=1.3, arrowwidth=1.4,
