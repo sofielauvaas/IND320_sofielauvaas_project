@@ -10,6 +10,10 @@ def _init_globals():
     st.session_state.setdefault("price_area", "NO1")
     st.session_state.setdefault("production_group", GROUPS[:])
 
+    # Ensure canonical state is never empty, even on initialization
+    if not st.session_state["production_group"]:
+        st.session_state["production_group"] = GROUPS[:]
+
 def _sync_widgets_to_state():
     """Callback function to sync widget values to the canonical session state keys."""
     # Read the updated values from the temporary widget keys
@@ -51,15 +55,15 @@ def render_app_state_controls():
     # --- 2. Production Group Pills in Expander (Unique Visual) ---
     
     # Use the current canonical state as the default
-    default_groups = st.session_state["production_group"]
-    current_selection = st.session_state.get("_group_selector", default_groups)
+    default_groups_for_pills = st.session_state["production_group"]
 
     with st.expander("Filter Production Sources", expanded=True): # New organizational element
         st.pills(
             "Select Energy Sources", # New widget label
             options=GROUPS,
             selection_mode="multi",
-            default=current_selection, 
+            # Use the canonical state as the guaranteed non-empty default
+            default=default_groups_for_pills, 
             key="_group_selector",
             on_change=_sync_widgets_to_state
         )

@@ -104,9 +104,19 @@ with tab2:
 
     col_c, col_d = st.columns(2)
     with col_c:
-        contamination = st.slider("Contamination Level (Expected % of Anomalies)", min_value=0.001, max_value=0.1, value=0.01, step=0.001, format="%.3f", help="The expected proportion of outliers in the data.")
+        contamination = st.slider(
+            "Contamination Level (Expected % of Anomalies)", 
+            min_value=0.001, max_value=0.1, value=0.01, step=0.001, format="%.3f", 
+            key='lof_contamination_slider',
+            help="The expected proportion of outliers in the data."
+        )
     with col_d:
-        n_neighbors = st.slider("Number of Neighbors (n_neighbors)", min_value=5, max_value=50, value=20, step=1, help="Number of neighbors used to calculate local density.")
+        n_neighbors = st.slider(
+            "Number of Neighbors (n_neighbors)", 
+            min_value=5, max_value=50, value=20, step=1, 
+            key='lof_neighbors_slider', 
+            help="Number of neighbors used to calculate local density."
+        )
 
     if selected_variable in df_ready.columns:
         fig, summary = functions.precipitation_lof_plot( 
