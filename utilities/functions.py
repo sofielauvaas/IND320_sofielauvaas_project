@@ -133,6 +133,20 @@ def temperature_spc_from_satv(time, temperature, keep_low_index=100, k=3.0):
     x = np.asarray(temperature, dtype=float)
     n = len(x)
     
+    # AI suggested this fix to handle NaNs before DCT. This wasnt orgininally a problem, but NaNs can appear in weather data.
+    # Convert to Pandas Series for interpolation
+    series = pd.Series(x)
+    # Linear interpolation (fills internal NaNs)
+    series_clean = series.interpolate(method='linear')
+    # Forward/backward fill for NaNs at the start/end (if any)
+    x_clean = series_clean.fillna(method='bfill').fillna(method='ffill').to_numpy()
+    
+    if np.any(np.isnan(x_clean)):
+        # Fallback if interpolation fails entirely (e.g., all data is NaN)
+        warnings.warn("Data still contains NaNs after interpolation. DCT may fail.")
+        return go.Figure().update_layout(title="Error: Data contains unrecoverable NaNs."), {"n_outliers": 0, "n_total": n, "percent_outliers": 0, "robust_std": 0}
+
+
     satv, trend = dct_highpass_filter(x, keep_low_index)
     
     center = np.median(satv)
@@ -173,11 +187,16 @@ def precipitation_lof_plot(time, precipitation, contamination=0.01, n_neighbors=
     n_total = len(X)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=np.array(time)[~is_outlier], y=X[~is_outlier, 0], mode="lines", name="Precipitation (Inliers)", line=dict(color='#035397', width=1.0)))
+    fig.add_trace(go.Scatter(x=np.array(time)[~is_outlier], y=X[~is_outlier, 0], mode="lines", name=f"{variable_name} (Inliers)", line=dict(color='#035397', width=1.0)))
     fig.add_trace(go.Scatter(x=np.array(time)[is_outlier], y=X[is_outlier, 0], mode="markers", name="Anomalies (LOF)", marker=dict(color="#128264", size=6, opacity=0.8)))
 
-    fig.update_layout(template="plotly_white", title=f"{variable_name} Anomalies via LOF (Contamination: {contamination*100:.1f}%)", xaxis_title="Date", yaxis_title=f"{variable_name} (Value)", title_x=0.5)
-
+    fig.update_layout(
+        template="plotly_white", 
+        title=f"{variable_name} Anomalies via LOF (Contamination: {contamination*100:.1f}%, Neighbors: {n_neighbors})", 
+        xaxis_title="Date", 
+        yaxis_title=f"{variable_name} (Value)", 
+        title_x=0.5
+    )
     summary = {
         "n_total": n_total, 
         "n_outliers": n_outliers, 

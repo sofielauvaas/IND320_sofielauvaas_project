@@ -114,6 +114,7 @@ with tab2:
             df_ready[selected_variable], 
             contamination=contamination,
             n_neighbors=n_neighbors,
+            variable_name=selected_variable # Pass the dynamic name here
             )
         st.plotly_chart(fig, use_container_width=True)
 
