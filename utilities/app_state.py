@@ -14,9 +14,14 @@ def _sync_widgets_to_state():
     """Callback function to sync widget values to the canonical session state keys."""
     # Read the updated values from the temporary widget keys
     st.session_state["price_area"] = st.session_state["_area_selector"]
-    st.session_state["production_group"] = st.session_state["_group_selector"]
+    groups_selection = st.session_state["_group_selector"]
     
-    # Optional: Update query parameters for bookmarking/sharing
+
+    if not groups_selection or any(v not in GROUPS for v in groups_selection):
+        st.session_state["production_group"] = GROUPS[:] # Set to full default list
+    else:
+        st.session_state["production_group"] = groups_selection
+    
     st.query_params.update(
         area=st.session_state["price_area"],
         groups=",".join(st.session_state["production_group"])
