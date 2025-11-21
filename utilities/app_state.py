@@ -64,12 +64,3 @@ def render_app_state_controls():
             on_change=_sync_widgets_to_state
         )
     
-    # --- Post-render validation ---
-    final_selection = st.session_state["_group_selector"]
-    
-    # Basic normalization: if nothing is selected or if the selection is invalid, reset to all
-    if not final_selection or any(v not in GROUPS for v in final_selection):
-        # We only reset the canonical state. Streamlit will fix the widget on the next run.
-        st.session_state["production_group"] = GROUPS[:]
-    else:
-        st.session_state["production_group"] = final_selection
