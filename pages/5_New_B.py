@@ -122,7 +122,7 @@ with tab2:
         fig, summary = functions.precipitation_lof_plot( 
             df_ready["time"].values,
             df_ready[selected_variable], 
-            outlier_frac=outlier_fraction, # <-- **FIXED: Changed 'contamination' to 'outlier_frac'**
+            outlier_frac=outlier_fraction,
             n_neighbors=n_neighbors,
             variable_name=selected_variable
             )
