@@ -32,8 +32,7 @@ st.info(
     f"""
     **Analysis Scope** (by the sidebar configuration):
     
-    * **Price Area:** **{selected_area}** 
-    """
+    * **Price Area:** **{selected_area}** """
 )
 
 
@@ -104,8 +103,9 @@ with tab2:
 
     col_c, col_d = st.columns(2)
     with col_c:
-        contamination = st.slider(
-            "Contamination Level (Expected % of Anomalies)", 
+        # Renamed slider variable for consistency
+        outlier_fraction = st.slider(
+            "Outlier Fraction (Expected % of Anomalies)", 
             min_value=0.001, max_value=0.1, value=0.01, step=0.001, format="%.3f", 
             key='lof_contamination_slider',
             help="The expected proportion of outliers in the data."
@@ -122,9 +122,9 @@ with tab2:
         fig, summary = functions.precipitation_lof_plot( 
             df_ready["time"].values,
             df_ready[selected_variable], 
-            contamination=contamination,
+            outlier_frac=outlier_fraction, # <-- **FIXED: Changed 'contamination' to 'outlier_frac'**
             n_neighbors=n_neighbors,
-            variable_name=selected_variable # Pass the dynamic name here
+            variable_name=selected_variable
             )
         st.plotly_chart(fig, use_container_width=True)
 

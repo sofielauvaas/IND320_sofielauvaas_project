@@ -171,37 +171,102 @@ def temperature_spc_from_satv(time, temperature, keep_low_index=100, k=3.0):
     summary = {"n_outliers": int(is_outlier.sum()), "n_total": int(n), "percent_outliers": round(100 * is_outlier.mean(), 2), "robust_std": spread}
     return fig, summary
 
-def precipitation_lof_plot(time, precipitation, contamination=0.01, n_neighbors=30, variable_name="Precipitation"):
+def precipitation_lof_plot(time, data_series, outlier_frac=0.01, n_neighbors=30, variable_name="Precipitation"):
     """
-    Detects and plots precipitation anomalies using Local Outlier Factor (LOF). 
-    Returns the LOF score for deeper analysis.
+    Detects and plots anomalies using Local Outlier Factor (LOF). 
+    
+    Uses domain-specific logic (filtering zeroes and log-transform) for sparse data 
+    like precipitation to ensure meaningful anomaly detection.
     """
     
-    X = np.array(precipitation.fillna(0)).reshape(-1, 1)
+    # 1. Prepare data - Handle NaNs by filling with 0 and filter for non-zero values
+    precip = data_series.fillna(0)
+    nonzero_mask = precip > 0
+    
+    # Extract non-zero values, apply log(1 + x) transformation, and reshape for LOF
+    X_nonzero = np.log1p(precip[nonzero_mask].values.reshape(-1, 1))
+    
+    n_nonzero = len(X_nonzero)
+    
+    # Initialize mask for the full time series
+    full_anomaly_mask = np.zeros(len(precip), dtype=bool)
+    n_outliers = 0
+    scores = np.zeros(n_nonzero)
 
-    lof = LocalOutlierFactor(n_neighbors=n_neighbors, contamination=contamination)
-    labels = lof.fit_predict(X) 
-    scores = -lof.negative_outlier_factor_
-    is_outlier = labels == -1
-    n_outliers = int(is_outlier.sum())
-    n_total = len(X)
+    if n_nonzero > n_neighbors:
+        # Set n_neighbors dynamically to prevent errors if the non-zero set is small
+        n_neighbors_safe = min(n_neighbors, n_nonzero - 1)
+        
+        # 2. Fit Local Outlier Factor
+        lof = LocalOutlierFactor(n_neighbors=n_neighbors_safe)
+        lof.fit(X_nonzero)
+        scores = -lof.negative_outlier_factor_
+        
+        # 3. Define threshold using quantile based on slider (outlier_frac)
+        threshold = np.quantile(scores, 1 - outlier_frac)
+        anomaly_mask_nonzero = scores > threshold
+        
+        # 4. Map the anomaly mask back to the full time series
+        nonzero_indices = np.where(nonzero_mask)[0]
+        full_anomaly_mask[nonzero_indices[anomaly_mask_nonzero]] = True
+        
+        anomalies_df = precip[full_anomaly_mask]
+        n_outliers = len(anomalies_df)
+    else:
+        # Not enough data for LOF
+        pass 
 
+    # 5. Calculate Y-axis range with aggressive padding (Visual Fix)
+    data_max = precip.max()
+    data_min = precip.min()
+    data_range = data_max - data_min
+    
+    y_range_buffer = data_range * 0.25 
+    
+    y_min = max(-0.01, data_min - y_range_buffer)
+    y_max = data_max + y_range_buffer
+
+    # 6. Plotting
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=np.array(time)[~is_outlier], y=X[~is_outlier, 0], mode="lines", name=f"{variable_name} (Inliers)", line=dict(color='#035397', width=1.0)))
-    fig.add_trace(go.Scatter(x=np.array(time)[is_outlier], y=X[is_outlier, 0], mode="markers", name="Anomalies (LOF)", marker=dict(color="#128264", size=6, opacity=0.8)))
+    
+    # Base Time Series Trace (All data, including zeroes)
+    fig.add_trace(go.Scatter(
+        x=np.array(time), 
+        y=precip, 
+        mode="lines", 
+        name=f"{variable_name} Time Series", 
+        line=dict(color='#035397', width=1.0),
+        marker=dict(size=2, color='#035397', opacity=0.5)
+    ))
+    
+    # Anomalies (Overlay Markers)
+    outlier_times = np.array(time)[full_anomaly_mask]
+    outlier_values = precip[full_anomaly_mask]
+    
+    fig.add_trace(go.Scatter(
+        x=outlier_times, 
+        y=outlier_values, 
+        mode="markers", 
+        name="Anomalies (LOF)", 
+        marker=dict(color="#d43939", size=8, opacity=1.0, symbol='circle', line=dict(width=1.5, color='black'))
+    ))
 
     fig.update_layout(
         template="plotly_white", 
-        title=f"{variable_name} Anomalies via LOF (Contamination: {contamination*100:.1f}%, Neighbors: {n_neighbors})", 
+        title=f"{variable_name} Anomalies via LOF (Outlier Fraction: {outlier_frac*100:.1f}%, Neighbors: {n_neighbors})", 
         xaxis_title="Date", 
         yaxis_title=f"{variable_name} (Value)", 
-        title_x=0.5
+        title_x=0.5,
+        yaxis=dict(range=[y_min, y_max], fixedrange=False)
     )
+    
+    # 7. Summary
+    n_total = len(precip)
     summary = {
         "n_total": n_total, 
         "n_outliers": n_outliers, 
         "percent_outliers": round(100 * n_outliers / n_total, 2),
-        "lof_scores": scores
+        "lof_scores": scores 
     }
     return fig, summary
 
