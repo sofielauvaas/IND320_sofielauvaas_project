@@ -296,7 +296,7 @@ def stl_decomposition_elhub(df, pricearea="NO5", productiongroup="hydro", period
 
 def create_spectrogram(
     df_prod, 
-    pricearea='NO5', 
+    pricearea='NO5', # Uses pricearea (no underscore)
     productiongroup='hydro', 
     window_length=24 * 7,
     overlap=24 * 4         

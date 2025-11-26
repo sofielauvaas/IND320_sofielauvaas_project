@@ -86,7 +86,7 @@ with tab1:
         with st.spinner("Performing STL decomposition..."):
             fig_stl = functions.stl_decomposition_elhub(
                 df_production,
-                pricearea=pricearea, 
+                pricearea=pricearea, # Uses pricearea (no underscore)
                 productiongroup=selected_group_for_analysis,
                 period=period,
                 seasonal=seasonal,
@@ -115,7 +115,7 @@ with tab2:
             # ASSUMPTION: functions.create_spectrogram is updated to return a Plotly figure
             fig_spec = functions.create_spectrogram( 
                 df_production, 
-                pricearea=pricearea, 
+                pricearea=pricearea, # Uses pricearea (no underscore)
                 productiongroup=selected_group_for_analysis,
                 window_length=window_length,
                 overlap=overlap
