@@ -21,7 +21,7 @@ AREA_COORDINATES = {
     "NO1": (59.9122, 10.7313), "NO2": (58.1599, 8.0182), "NO3": (63.4305, 10.3951),
     "NO4": (69.6498, 18.9841), "NO5": (60.3913, 5.3221) 
 }
-TARGET_YEAR = 2021
+# Removed TARGET_YEAR = 2021
 BASE_WEATHER_URL = "https://archive-api.open-meteo.com/v1/archive"
 
 
@@ -31,52 +31,42 @@ retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
 openmeteo_client = openmeteo_requests.Client(session=retry_session) 
 
 
-# --- MONGODB CONNECTION AND DATA LOADING ---
+# --- MONGODB CONNECTION AND DATA LOADING (UPDATED FOR ALL YEARS) ---
 
 @st.cache_data(ttl=3600, show_spinner="Loading Elhub production data...")
 def load_data_from_mongo():
-    """Establishes connection and loads all Elhub 2021 production data."""
+    """
+    Establishes connection and loads ALL available production data from MongoDB (2021-2024).
+    """
     uri = st.secrets["mongodb"]["uri"]
     client = MongoClient(uri)
 
     db_name = st.secrets["mongodb"]["database"]
-    col_name = st.secrets["mongodb"]["collection"]
+    col_name = st.secrets["mongodb"]["collection"] # Assumes this collection now holds all 2021-2024 production data
     db = client[db_name]
     collection = db[col_name] 
     
+    # Load all items without a year filter
     items = list(collection.find({}, {'_id': 0})) 
     df = pd.DataFrame(items)
     client.close()
 
-    # 1. Convert all existing columns to lowercase as a first step
-    df.columns = [c.lower() for c in df.columns]
+    # 1. Convert all existing columns to lowercase
+    df.columns = [c.lower().strip() for c in df.columns]
     
-    # 2. Aggressive renaming to ensure expected column names, covering previous possible casings
-    # NOTE: This step is CRITICAL for resolving the KeyError
+    # 2. Aggressive renaming for consistency
     df.rename(columns={
-        'pricearea': 'pricearea',           # Safe check
-        'pricearea ': 'pricearea',          # Check for trailing spaces
-        'pricearea': 'pricearea',           # This is what's expected from the notebook
-        'productiongroup': 'productiongroup', # Expected
-        'starttime': 'starttime',           # Expected
-        'endtime': 'endtime',               # Expected
-        'quantitykwh': 'quantitykwh',       # Expected
-        'lastupdatedtime': 'lastupdatedtime', # Expected
-        
-        # Explicit checks for CamelCase survivors (e.g., if PyMongo/Pandas preserved original casing during load)
         'pricearea': 'pricearea',
-        'productiongroup': 'productiongroup',
-        'starttime': 'starttime', 
+        'productiongroup': 'productiongroup', 
+        'starttime': 'starttime',
         'endtime': 'endtime',
         'quantitykwh': 'quantitykwh',
         'lastupdatedtime': 'lastupdatedtime',
-        
-        # Explicit checks for old hyphenated names that may have survived lowercasing
         'start-time': 'starttime', 
         'quantity-kwh': 'quantitykwh'
     }, inplace=True, errors='ignore') 
 
-    # --- Type Conversion and Feature Engineering (using the standardized names) ---
+    # --- Type Conversion and Feature Engineering ---
     if 'starttime' in df.columns:
         df['starttime'] = pd.to_datetime(df['starttime'], errors='coerce')
         df['month_name'] = df['starttime'].dt.strftime('%B')
@@ -86,23 +76,23 @@ def load_data_from_mongo():
         
     return df
 
-# --- GEO AND WEATHER DATA SOURCING ---
+# --- GEO AND WEATHER DATA SOURCING (UPDATED FOR 2021-2024) ---
 
 @st.cache_data(ttl=3600, show_spinner="Downloading weather data...")
 def download_weather_data(pricearea):
     """
-    Downloads hourly historical ERA5 Reanalysis weather data for the given price area.
-    (Simplified function signature to take only one argument, unlike the Notebook function)
+    Downloads hourly historical ERA5 Reanalysis weather data for the given price area,
+    covering the full 2021-2024 range.
     """
     area = pricearea.upper()
     if area not in AREA_COORDINATES:
         raise ValueError(f"Price Area {area} not found in coordinates dictionary.")
         
     latitude, longitude = AREA_COORDINATES[area] # Lookup coordinates
-    year = TARGET_YEAR # Use the global year
     
-    start_date = f"{year}-01-01"
-    end_date = f"{year}-12-31"
+    # UPDATED: Use fixed start and end dates to cover the entire data range
+    start_date = "2021-01-01"
+    end_date = "2024-12-31"
 
     hourly_variables = ["temperature_2m", "precipitation", "wind_speed_10m", "wind_gusts_10m", "wind_direction_10m"]
     
@@ -113,7 +103,6 @@ def download_weather_data(pricearea):
         "models": "era5",
     }
     
-    # Use the global robust client
     responses = openmeteo_client.weather_api(BASE_WEATHER_URL, params=params)
     response = responses[0]
 
@@ -137,7 +126,7 @@ def download_weather_data(pricearea):
     return df
 
 
-# --- ANOMALY DETECTION FUNCTIONS ---
+# --- ANOMALY DETECTION FUNCTIONS (No changes needed, they operate on data provided) ---
 
 def dct_highpass_filter(signal, keep_index):
     """High-pass filter using DCT to remove the slow trend, leaving the Seasonally Adjusted Variation."""
@@ -158,21 +147,17 @@ def temperature_spc_from_satv(time, temperature, keep_low_index=100, k=3.0):
     x = np.asarray(temperature, dtype=float)
     n = len(x)
     
-    # AI suggested this fix to handle NaNs before DCT. This wasnt orgininally a problem, but NaNs can appear in weather data.
-    # Convert to Pandas Series for interpolation
+    # Handle NaNs before DCT
     series = pd.Series(x)
-    # Linear interpolation (fills internal NaNs)
     series_clean = series.interpolate(method='linear')
-    # Forward/backward fill for NaNs at the start/end (if any)
     x_clean = series_clean.fillna(method='bfill').fillna(method='ffill').to_numpy()
     
     if np.any(np.isnan(x_clean)):
-        # Fallback if interpolation fails entirely (e.g., all data is NaN)
-        warnings.warn("Data still contains NaNs after interpolation. DCT may fail.")
+        warnings.warn("Data still contains unrecoverable NaNs.")
         return go.Figure().update_layout(title="Error: Data contains unrecoverable NaNs."), {"n_outliers": 0, "n_total": n, "percent_outliers": 0, "robust_std": 0}
 
 
-    satv, trend = dct_highpass_filter(x, keep_low_index)
+    satv, trend = dct_highpass_filter(x_clean, keep_low_index)
     
     center = np.median(satv)
     mad = np.median(np.abs(satv - center))
@@ -199,49 +184,37 @@ def temperature_spc_from_satv(time, temperature, keep_low_index=100, k=3.0):
 def precipitation_lof_plot(time, data_series, outlier_frac=0.01, n_neighbors=30, variable_name="Precipitation"):
     """
     Detects and plots anomalies using Local Outlier Factor (LOF). 
-    
-    Uses domain-specific logic (filtering zeroes and log-transform) for sparse data 
-    like precipitation to ensure meaningful anomaly detection.
     """
     
-    # 1. Prepare data - Handle NaNs by filling with 0 and filter for non-zero values
     precip = data_series.fillna(0)
     nonzero_mask = precip > 0
     
-    # Extract non-zero values, apply log(1 + x) transformation, and reshape for LOF
     X_nonzero = np.log1p(precip[nonzero_mask].values.reshape(-1, 1))
     
     n_nonzero = len(X_nonzero)
     
-    # Initialize mask for the full time series
     full_anomaly_mask = np.zeros(len(precip), dtype=bool)
     n_outliers = 0
     scores = np.zeros(n_nonzero)
 
     if n_nonzero > n_neighbors:
-        # Set n_neighbors dynamically to prevent errors if the non-zero set is small
         n_neighbors_safe = min(n_neighbors, n_nonzero - 1)
         
-        # 2. Fit Local Outlier Factor
         lof = LocalOutlierFactor(n_neighbors=n_neighbors_safe)
         lof.fit(X_nonzero)
         scores = -lof.negative_outlier_factor_
         
-        # 3. Define threshold using quantile based on slider (outlier_frac)
         threshold = np.quantile(scores, 1 - outlier_frac)
         anomaly_mask_nonzero = scores > threshold
         
-        # 4. Map the anomaly mask back to the full time series
         nonzero_indices = np.where(nonzero_mask)[0]
         full_anomaly_mask[nonzero_indices[anomaly_mask_nonzero]] = True
         
         anomalies_df = precip[full_anomaly_mask]
         n_outliers = len(anomalies_df)
     else:
-        # Not enough data for LOF
         pass 
 
-    # 5. Calculate Y-axis range with aggressive padding (Visual Fix)
     data_max = precip.max()
     data_min = precip.min()
     data_range = data_max - data_min
@@ -251,10 +224,8 @@ def precipitation_lof_plot(time, data_series, outlier_frac=0.01, n_neighbors=30,
     y_min = max(-0.01, data_min - y_range_buffer)
     y_max = data_max + y_range_buffer
 
-    # 6. Plotting
     fig = go.Figure()
     
-    # Base Time Series Trace (All data, including zeroes)
     fig.add_trace(go.Scatter(
         x=np.array(time), 
         y=precip, 
@@ -264,7 +235,6 @@ def precipitation_lof_plot(time, data_series, outlier_frac=0.01, n_neighbors=30,
         marker=dict(size=2, color='#035397', opacity=0.5)
     ))
     
-    # Anomalies (Overlay Markers)
     outlier_times = np.array(time)[full_anomaly_mask]
     outlier_values = precip[full_anomaly_mask]
     
@@ -285,7 +255,6 @@ def precipitation_lof_plot(time, data_series, outlier_frac=0.01, n_neighbors=30,
         yaxis=dict(range=[y_min, y_max], fixedrange=False)
     )
     
-    # 7. Summary
     n_total = len(precip)
     summary = {
         "n_total": n_total, 
@@ -296,7 +265,7 @@ def precipitation_lof_plot(time, data_series, outlier_frac=0.01, n_neighbors=30,
     return fig, summary
 
 
-# --- TIME SERIES ANALYSIS FUNCTIONS ---
+# --- TIME SERIES ANALYSIS FUNCTIONS (Spectrogram converted to Plotly) ---
 
 def stl_decomposition_elhub(df, pricearea="NO5", productiongroup="hydro", period=168, seasonal=9, trend=241, robust=False):
     """Performs Seasonal-Trend Decomposition using LOESS (STL) on the selected production group's hourly data."""
@@ -309,6 +278,10 @@ def stl_decomposition_elhub(df, pricearea="NO5", productiongroup="hydro", period
     subset = subset.set_index(pd.to_datetime(subset["starttime"]))
     ts = subset.groupby(level=0)['quantitykwh'].sum().asfreq('h').ffill().sort_index()
     
+    # Fill any gaps created by ffill/asfreq before running STL
+    if ts.isnull().any():
+        ts = ts.fillna(ts.mean())
+        
     result = STL(ts, period=period, seasonal=seasonal, trend=trend, robust=robust).fit()
     components_map = {"Observed": ts, "Trend": result.trend, "Seasonal": result.seasonal, "Remainder": result.resid}
     
@@ -316,7 +289,7 @@ def stl_decomposition_elhub(df, pricearea="NO5", productiongroup="hydro", period
     for i, (name, component_series) in enumerate(components_map.items()):
         fig.add_trace(go.Scatter(x=component_series.index, y=component_series.values, mode="lines", line=dict(color=line_color, width=1), name=name), row=i + 1, col=1)
     
-    fig.update_layout(height=950, template="plotly_white", title=f"STL Decomposition — {pricearea.upper()} {productiongroup.capitalize()}", title_x=0.5, showlegend=False, margin=dict(t=80, b=50, l=50, r=20))
+    fig.update_layout(height=950, template="plotly_white", title=f"STL Decomposition — {pricearea.upper()} {productiongroup.capitalize()} (2021-2024)", title_x=0.5, showlegend=False, margin=dict(t=80, b=50, l=50, r=20))
     fig.update_xaxes(title_text="Date", row=4, col=1)
     return fig
 
@@ -329,8 +302,8 @@ def create_spectrogram(
     overlap=24 * 4         
 ):
     """
-    Creates a power spectrogram (STFT) where the Y-axis is converted to 
-    cycles/day, including a bi-daily marker.
+    Creates a power spectrogram (STFT) using Plotly where the Y-axis is converted to 
+    cycles/day, including key frequency markers.
     """
     
     subset = df_prod[
@@ -344,7 +317,7 @@ def create_spectrogram(
     if len(ts) < window_length:
          raise ValueError("Time series too short for Spectrogram with current window size.")
 
-    fs = 1.0
+    fs = 1.0 # Sampling frequency is 1 per hour
     f, t_hours, Sxx = spectrogram(
         ts, 
         fs=fs, 
@@ -353,27 +326,49 @@ def create_spectrogram(
         detrend='constant'
     )
 
+    # Convert to power (dB)
     power_db = 10 * np.log10(Sxx + 1e-12)
     
     # Convert axes for intuitive analysis
-    t_days = t_hours / 24 
-    f_cycles_per_day = f * 24 
+    t_days = t_hours / 24 # Time in days
+    f_cycles_per_day = f * 24 # Frequency in cycles per day
     
-    fig, ax = plt.subplots(figsize=(14, 7))
-    im = ax.pcolormesh(t_days, f_cycles_per_day, power_db, shading='gouraud', cmap='viridis')
+    # Plotly Heatmap Figure
+    fig = go.Figure(data=go.Heatmap(
+        z=power_db,
+        x=t_days,
+        y=f_cycles_per_day,
+        colorscale='Viridis',
+        colorbar=dict(title='Power (dB)')
+    ))
+
+    # Add annotations for key frequencies
+    key_cycles = [
+        (1.0, 'Daily Cycle'), 
+        (2.0, 'Bi-Daily Cycle'), 
+        (1.0/7.0, 'Weekly Cycle')
+    ]
     
-    ax.set_title(f"Spectrogram (STFT) — {pricearea.upper()} {productiongroup.capitalize()}", fontsize=16)
-    ax.set_xlabel("Time [days]", fontsize=12)
-    ax.set_ylabel("Frequency [cycles/day]", fontsize=12)
+    # Add lines for key frequencies
+    for freq, label in key_cycles:
+        if freq < np.max(f_cycles_per_day):
+            fig.add_shape(
+                type="line",
+                x0=t_days.min(), y0=freq, x1=t_days.max(), y1=freq,
+                line=dict(color="Red" if freq == 1.0 else "White", width=1.5, dash="dash"),
+                name=label
+            )
+            # Add text label (optional, Plotly figures handle annotations differently than plt.axhline text)
     
-    # Highlight key cycles on the new axis scale
-    ax.set_ylim(0, 5) 
-    ax.set_yticks([1.0, 2.0, 1.0/7.0]) 
-    ax.set_yticklabels([f'Daily Cycle (1.0)', f'Bi-Daily Cycle (2.0)', f'Weekly Cycle ({1/7:.2f})'])
-    ax.axhline(y=1.0, color='r', linestyle='--', linewidth=1)
-    ax.axhline(y=2.0, color='y', linestyle='--', linewidth=1) 
-    ax.axhline(y=1.0/7.0, color='w', linestyle='--', linewidth=1)
     
-    fig.colorbar(im, ax=ax, label="Power [dB]")
-    plt.tight_layout()
+    fig.update_layout(
+        title=f"Spectrogram (STFT) — {pricearea.upper()} {productiongroup.capitalize()} (2021-2024)",
+        xaxis_title="Time [days]",
+        yaxis_title="Frequency [cycles/day]",
+        yaxis_range=[0, 5], # Focus on 0 to 5 cycles/day
+        template="plotly_white",
+        height=500,
+        title_x=0.5
+    )
+    
     return fig

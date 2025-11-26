@@ -16,21 +16,19 @@ with st.sidebar:
     render_app_state_controls()
 
 # --- 2. ACCESS GLOBAL STATE AND DATA FETCHING ---
-
-# Use the canonical key for the Price Area
 selected_area = st.session_state.get('pricearea')
 
 if not selected_area:
-    st.info("The global Price Area selector is not yet initialized. Please use the sidebar.")
+    st.info("The global Price Area selector is not yet initialized. Please use the sidebar on the Production Explorer page.")
     st.stop() 
 
 
-st.title("Anomaly and Outlier Detection")
+st.title("Anomaly and Outlier Detection (2021–2024)")
 
 # --- DISPLAY CONTEXT BOX ---
 st.info(
     f"""
-    **Analysis Scope** (by the sidebar configuration):
+    **Analysis Scope** (by the explorer page configuration):
     
     * **Price Area:** **{selected_area}** """
 )
@@ -38,7 +36,8 @@ st.info(
 
 # Load data using the cached API function
 try:
-    df = functions.download_weather_data(selected_area) 
+    with st.spinner(f"Loading weather data for {selected_area}..."):
+        df = functions.download_weather_data(selected_area) 
     
     if df is None or df.empty:
         st.error("Failed to retrieve weather data or dataset is empty. Check API/network.")
@@ -76,13 +75,14 @@ with tab1:
         num_std = st.slider("Number of Robust Standard Deviations (k)", min_value=2.0, max_value=5.0, value=3.0, step=0.1, help="Defines the control limits (Center ± k * Robust Std. Dev.).")
 
     if 'temperature_2m' in df_ready.columns:
-        fig, summary = functions.temperature_spc_from_satv(
-            df_ready["time"].values,
-            df_ready["temperature_2m"].values,
-            keep_low_index=freq_cutoff, 
-            k=num_std
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        with st.spinner("Running Robust SPC Analysis..."):
+            fig, summary = functions.temperature_spc_from_satv(
+                df_ready["time"].values,
+                df_ready["temperature_2m"].values,
+                keep_low_index=freq_cutoff, 
+                k=num_std
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("Summary Statistics")
         st.write(f"**Total records analyzed:** {summary['n_total']}")
@@ -103,7 +103,6 @@ with tab2:
 
     col_c, col_d = st.columns(2)
     with col_c:
-        # Renamed slider variable for consistency
         outlier_fraction = st.slider(
             "Outlier Fraction (Expected % of Anomalies)", 
             min_value=0.001, max_value=0.1, value=0.01, step=0.001, format="%.3f", 
@@ -119,14 +118,15 @@ with tab2:
         )
 
     if selected_variable in df_ready.columns:
-        fig, summary = functions.precipitation_lof_plot( 
-            df_ready["time"].values,
-            df_ready[selected_variable], 
-            outlier_frac=outlier_fraction,
-            n_neighbors=n_neighbors,
-            variable_name=selected_variable
-            )
-        st.plotly_chart(fig, use_container_width=True)
+        with st.spinner(f"Running LOF Analysis on {selected_variable}..."):
+            fig, summary = functions.precipitation_lof_plot( 
+                df_ready["time"].values,
+                df_ready[selected_variable], 
+                outlier_frac=outlier_fraction,
+                n_neighbors=n_neighbors,
+                variable_name=selected_variable
+                )
+            st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("Anomaly Summary")
         st.write(f"**Total records analyzed:** {summary['n_total']}")

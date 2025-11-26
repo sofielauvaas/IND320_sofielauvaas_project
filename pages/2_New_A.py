@@ -11,20 +11,20 @@ with st.sidebar:
     render_app_state_controls()
 
 # --- 2. ACCESS GLOBAL STATE ---
-# Read the globally selected price area and groups from session_state
 pricearea = st.session_state.get("pricearea")
 globally_selected_groups = st.session_state.get("productiongroup")
 
 # --- INITIAL CHECK ---
 if not pricearea or not globally_selected_groups:
-    st.info("Please use the sidebar to select a Price Area and at least one Production Group.")
+    st.info("Please select a Price Area and at least one Production Group on the Production/Consumption Explorer pages before viewing this analysis.")
     st.stop()
 
-st.title("Time Series Decomposition and Frequency Analysis")
+st.title("Time Series Decomposition and Frequency Analysis (2021–2024)")
 
 # --- DATA LOADING ---
 try:
-    df_production = functions.load_data_from_mongo()
+    with st.spinner("Loading production data..."):
+        df_production = functions.load_data_from_mongo()
 except Exception as e:
     st.error(f"Failed to load production data from MongoDB. Error: {e}")
     st.stop() 
@@ -33,15 +33,23 @@ if df_production.empty:
     st.warning("No production data found in the MongoDB collection.")
     st.stop()
 
+# --- DATA SANITIZATION (From previous fix) ---
+df_production.columns = df_production.columns.str.strip().str.lower()
+if 'productionGroup' in df_production.columns:
+    df_production.rename(columns={'productionGroup': 'productiongroup'}, inplace=True)
+if 'productiongroup' not in df_production.columns:
+    st.error("FATAL ERROR: The required column 'productiongroup' could not be found.")
+    st.stop()
+# ---------------------------------------------
+
+
 # --- FILTERING LOGIC & CONTEXT DISPLAY ---
-# Use the globally selected groups for analysis
 analysis_options = globally_selected_groups
 
-# Display the globally selected groups and area for context
 groups_text = ', '.join([g.capitalize() for g in analysis_options])
 st.info(
     f"""
-    **Analysis Scope** (by the sidebar configuartion):
+    **Analysis Scope** (by the explorer page configuration):
     
     * **Price Area:** **{pricearea}**
     * **Available Groups:** {groups_text}
@@ -49,14 +57,12 @@ st.info(
 )
 
 # --- LOCAL SELECTOR ---
-
-# Selector for the single group required for STL/Spectrogram
 st.markdown("##### Select Production Group for Detailed Analysis:")
 selected_group_for_analysis = st.selectbox(
     "Group:",
     analysis_options,
     index=0,
-    label_visibility="collapsed" # Hide label to keep it clean
+    label_visibility="collapsed"
 )
 
 # --- TABS AND ANALYSIS ---
@@ -65,7 +71,7 @@ tab1, tab2 = st.tabs(["STL Decomposition", "Spectrogram"])
 
 # TAB 1: STL Decomposition
 with tab1:
-    st.markdown(f"#### STL Decomposition: {selected_group_for_analysis.capitalize()} in {pricearea}")
+    st.markdown(f"#### Seasonal-Trend Decomposition (STL): {selected_group_for_analysis.capitalize()} in {pricearea}")
     
     col_period, col_seasonal, col_trend = st.columns(3)
     with col_period:
@@ -77,22 +83,24 @@ with tab1:
     
     
     try:
-        fig_stl = functions.stl_decomposition_elhub(
-            df_production,
-            pricearea=pricearea, 
-            productiongroup=selected_group_for_analysis,
-            period=period,
-            seasonal=seasonal,
-            trend=trend
-        )
-        st.plotly_chart(fig_stl, use_container_width=True)
+        with st.spinner("Performing STL decomposition..."):
+            fig_stl = functions.stl_decomposition_elhub(
+                df_production,
+                pricearea=pricearea, 
+                productiongroup=selected_group_for_analysis,
+                period=period,
+                seasonal=seasonal,
+                trend=trend
+            )
+            st.plotly_chart(fig_stl, use_container_width=True)
     except Exception as e:
         st.error(f"Error during STL Decomposition. Please check parameters or data availability. Error: {e}")
 
 
-# TAB 2: Spectrogram Analysis
+# TAB 2: Spectrogram Analysis (Requires functions.py to be updated to return Plotly)
 with tab2:
-    st.markdown(f"#### Spectrogram Analysis: {selected_group_for_analysis.capitalize()} in {pricearea}")
+    st.markdown(f"#### Spectrogram Frequency Analysis: {selected_group_for_analysis.capitalize()} in {pricearea}")
+    st.caption("Visualizes the power of different frequencies (periods) over time. Requires updating backend to use Plotly.")
     
     col_window, col_overlap = st.columns(2)
     with col_window:
@@ -103,13 +111,15 @@ with tab2:
         st.caption("Number of overlapping samples between segments.")
 
     try:
-        fig_spec = functions.create_spectrogram( 
-            df_production, 
-            pricearea=pricearea, 
-            productiongroup=selected_group_for_analysis,
-            window_length=window_length,
-            overlap=overlap
-        )
-        st.pyplot(fig_spec, use_container_width=True) 
+        with st.spinner("Calculating Spectrogram..."):
+            # ASSUMPTION: functions.create_spectrogram is updated to return a Plotly figure
+            fig_spec = functions.create_spectrogram( 
+                df_production, 
+                pricearea=pricearea, 
+                productiongroup=selected_group_for_analysis,
+                window_length=window_length,
+                overlap=overlap
+            )
+            st.plotly_chart(fig_spec, use_container_width=True) 
     except Exception as e:
         st.error(f"Error during Spectrogram analysis. Error: {e}")

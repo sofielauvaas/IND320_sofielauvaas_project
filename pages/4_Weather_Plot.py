@@ -22,9 +22,17 @@ LINE_COLORS = list(COLOR_MAP.values())
 
 # --- CACHED DATA PREPARATION & LOADING ---
 @st.cache_data(show_spinner=False)
-def prepare_data_subset(df, selected_months_num):
-    start_month, end_month = selected_months_num
-    subset = df[(df.index.month >= start_month) & (df.index.month <= end_month)].copy()
+def prepare_data_subset(df, selected_year_months):
+    # selected_year_months is a tuple of (start_YYYY-MM, end_YYYY-MM)
+    start_str, end_str = selected_year_months
+    
+    # Create a Year-Month index for filtering
+    df['year_month'] = df.index.strftime('%Y-%m')
+    
+    subset = df[(df['year_month'] >= start_str) & (df['year_month'] <= end_str)].copy()
+    
+    # Drop the temporary column before returning
+    subset = subset.drop(columns=['year_month'], errors='ignore')
     return subset
 
 @st.cache_data(show_spinner="Downloading weather data...")
@@ -41,15 +49,15 @@ with st.sidebar:
 selected_area = st.session_state.get('pricearea')
 
 if not selected_area:
-    st.info("The global Price Area selector is not yet initialized. Please use the sidebar.")
+    st.info("The global Price Area selector is not yet initialized. Please use the sidebar on the Production Explorer page.")
     st.stop() 
 
-st.title("Weather Data Visualisation")
+st.title("Weather Data Visualisation (2021–2024)")
 
 # --- DISPLAY CONTEXT BOX ---
 st.info(
     f"""
-    **Analysis Scope** (by the sidebar configuration):
+    **Analysis Scope** (by the explorer page configuration):
     
     * **Weather Location (Price Area):** **{selected_area}**
     """
@@ -59,7 +67,7 @@ st.info(
 try:
     df_raw = load_weather_data_local(selected_area) 
     if df_raw.empty:
-        st.warning(f"No weather data available for {selected_area}.")
+        st.warning(f"No weather data available for {selected_area} in the 2021-2024 range.")
         st.stop()
 except Exception as e:
     st.error(f"Error during data fetching: {e}")
@@ -70,19 +78,32 @@ except Exception as e:
 columns = list(df_raw.columns.drop(WIND_DIRECTION_COL, errors='ignore'))
 selected_col = st.selectbox("Select a column", ["All columns"] + columns)
 
-months = sorted(df_raw.index.month.unique())
-selected_months_num = st.select_slider(
-    "Select month range (Data is for 2021)",
-    options=months,
-    # Set default to first month only (January)
-    value=(months[0], months[0]), 
-    format_func=lambda x: pd.to_datetime(f"2023-{x}-01").strftime("%B")
+# Prepare YYYY-MM options for the slider
+df_raw['year_month'] = df_raw.index.strftime('%Y-%m')
+available_year_months = sorted(df_raw['year_month'].unique())
+
+if not available_year_months:
+    st.warning("No time series data available for range selection.")
+    st.stop()
+
+# --- FIX START: Set default value back to the first month only ---
+default_start_month = available_year_months[0]
+# --- FIX END ---
+
+
+# Use the YYYY-MM strings for the slider
+selected_year_months = st.select_slider(
+    "Select Month Range (Year-Month)",
+    options=available_year_months,
+    # The default value is now (first month, first month)
+    value=(default_start_month, default_start_month), 
+    format_func=lambda x: x # Display YYYY-MM directly
 )
 
 normalize_flag = st.checkbox("Normalize numeric columns (0-1 scale)")
 
 # 1. Get the filtered subset (cached)
-subset_indexed = prepare_data_subset(df_raw, selected_months_num)
+subset_indexed = prepare_data_subset(df_raw.drop(columns=['year_month']), selected_year_months)
 
 # 2. Apply normalization and create the plotting DataFrame
 df_plot = subset_indexed.reset_index().rename(columns={'index': 'time'})
@@ -102,9 +123,8 @@ if normalize_flag:
             df_plot[col] = 0.5 
 
 # Get month names for title
-month_names_list = subset_indexed.index.strftime("%B").to_list()
-first_month_name = month_names_list[0] 
-last_month_name = month_names_list[-1]
+first_month_name = selected_year_months[0]
+last_month_name = selected_year_months[1]
 
 # --- PLOTTING LOGIC ---
 
@@ -139,9 +159,7 @@ arrow_every = max(1, len(df_plot) // 90)
 arrow_y = global_y_min - (global_y_max - global_y_min) * 0.1
 arrow_len = (global_y_max - global_y_min) * 0.1
 
-# Define a fixed, small time offset based on the displayed data duration
 time_span = df_plot['time'].iloc[-1] - df_plot['time'].iloc[0]
-# Use 1% of the total displayed time span for the arrow's horizontal magnitude
 FIXED_TIME_OFFSET_MAGNITUDE = time_span * 0.01 
 
 
@@ -152,6 +170,7 @@ if WIND_DIRECTION_COL in df_plot.columns and (selected_col == "All columns" or s
         t = df_plot["time"].iloc[i]
         wind_dir = df_plot[WIND_DIRECTION_COL].iloc[i]
 
+        # Convert wind direction (degrees) to radians, adding 180 because arrows point from source
         theta = np.deg2rad(wind_dir + 180) 
 
         # Vertical movement (Y-axis): Uses the cosine component of the vector
@@ -159,7 +178,6 @@ if WIND_DIRECTION_COL in df_plot.columns and (selected_col == "All columns" or s
         arrow_y2 = arrow_y + y_change * 0.8
 
         # Horizontal movement (X-axis/Time): Uses the sine component of the vector
-        # Scale the fixed time magnitude by the horizontal component (sin(theta))
         x_change_prop = np.sin(theta) 
         arrow_dx = FIXED_TIME_OFFSET_MAGNITUDE * x_change_prop
         arrow_x2 = t + arrow_dx
