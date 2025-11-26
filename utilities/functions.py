@@ -48,9 +48,35 @@ def load_data_from_mongo():
     df = pd.DataFrame(items)
     client.close()
 
+    # 1. Convert all existing columns to lowercase as a first step
     df.columns = [c.lower() for c in df.columns]
-    df.rename(columns={'start-time': 'starttime', 'quantity-kwh': 'quantitykwh'}, inplace=True) 
+    
+    # 2. Aggressive renaming to ensure expected column names, covering previous possible casings
+    # NOTE: This step is CRITICAL for resolving the KeyError
+    df.rename(columns={
+        'pricearea': 'pricearea',           # Safe check
+        'pricearea ': 'pricearea',          # Check for trailing spaces
+        'pricearea': 'pricearea',           # This is what's expected from the notebook
+        'productiongroup': 'productiongroup', # Expected
+        'starttime': 'starttime',           # Expected
+        'endtime': 'endtime',               # Expected
+        'quantitykwh': 'quantitykwh',       # Expected
+        'lastupdatedtime': 'lastupdatedtime', # Expected
+        
+        # Explicit checks for CamelCase survivors (e.g., if PyMongo/Pandas preserved original casing during load)
+        'pricearea': 'pricearea',
+        'productiongroup': 'productiongroup',
+        'starttime': 'starttime', 
+        'endtime': 'endtime',
+        'quantitykwh': 'quantitykwh',
+        'lastupdatedtime': 'lastupdatedtime',
+        
+        # Explicit checks for old hyphenated names that may have survived lowercasing
+        'start-time': 'starttime', 
+        'quantity-kwh': 'quantitykwh'
+    }, inplace=True, errors='ignore') 
 
+    # --- Type Conversion and Feature Engineering (using the standardized names) ---
     if 'starttime' in df.columns:
         df['starttime'] = pd.to_datetime(df['starttime'], errors='coerce')
         df['month_name'] = df['starttime'].dt.strftime('%B')
@@ -60,16 +86,15 @@ def load_data_from_mongo():
         
     return df
 
-
 # --- GEO AND WEATHER DATA SOURCING ---
 
 @st.cache_data(ttl=3600, show_spinner="Downloading weather data...")
-def download_weather_data(price_area):
+def download_weather_data(pricearea):
     """
     Downloads hourly historical ERA5 Reanalysis weather data for the given price area.
     (Simplified function signature to take only one argument, unlike the Notebook function)
     """
-    area = price_area.upper()
+    area = pricearea.upper()
     if area not in AREA_COORDINATES:
         raise ValueError(f"Price Area {area} not found in coordinates dictionary.")
         
@@ -273,13 +298,13 @@ def precipitation_lof_plot(time, data_series, outlier_frac=0.01, n_neighbors=30,
 
 # --- TIME SERIES ANALYSIS FUNCTIONS ---
 
-def stl_decomposition_elhub(df, price_area="NO5", production_group="hydro", period=168, seasonal=9, trend=241, robust=False):
+def stl_decomposition_elhub(df, pricearea="NO5", productiongroup="hydro", period=168, seasonal=9, trend=241, robust=False):
     """Performs Seasonal-Trend Decomposition using LOESS (STL) on the selected production group's hourly data."""
     line_color = '#416287' 
-    subset = df[(df["pricearea"].str.upper() == price_area.upper()) & (df["productiongroup"].str.lower() == production_group.lower())].copy()
+    subset = df[(df["pricearea"].str.upper() == pricearea.upper()) & (df["productiongroup"].str.lower() == productiongroup.lower())].copy()
     
     if subset.empty:
-        raise ValueError(f"No data found for area '{price_area}' and group '{production_group}' for STL analysis.")
+        raise ValueError(f"No data found for area '{pricearea}' and group '{productiongroup}' for STL analysis.")
 
     subset = subset.set_index(pd.to_datetime(subset["starttime"]))
     ts = subset.groupby(level=0)['quantitykwh'].sum().asfreq('h').ffill().sort_index()
@@ -291,15 +316,15 @@ def stl_decomposition_elhub(df, price_area="NO5", production_group="hydro", peri
     for i, (name, component_series) in enumerate(components_map.items()):
         fig.add_trace(go.Scatter(x=component_series.index, y=component_series.values, mode="lines", line=dict(color=line_color, width=1), name=name), row=i + 1, col=1)
     
-    fig.update_layout(height=950, template="plotly_white", title=f"STL Decomposition — {price_area.upper()} {production_group.capitalize()}", title_x=0.5, showlegend=False, margin=dict(t=80, b=50, l=50, r=20))
+    fig.update_layout(height=950, template="plotly_white", title=f"STL Decomposition — {pricearea.upper()} {productiongroup.capitalize()}", title_x=0.5, showlegend=False, margin=dict(t=80, b=50, l=50, r=20))
     fig.update_xaxes(title_text="Date", row=4, col=1)
     return fig
 
 
 def create_spectrogram(
     df_prod, 
-    price_area='NO5', 
-    production_group='hydro', 
+    pricearea='NO5', 
+    productiongroup='hydro', 
     window_length=24 * 7,
     overlap=24 * 4         
 ):
@@ -309,8 +334,8 @@ def create_spectrogram(
     """
     
     subset = df_prod[
-        (df_prod['pricearea'].str.upper() == price_area.upper()) & 
-        (df_prod['productiongroup'].str.lower() == production_group.lower())
+        (df_prod['pricearea'].str.upper() == pricearea.upper()) & 
+        (df_prod['productiongroup'].str.lower() == productiongroup.lower())
     ].sort_values("starttime")
 
     subset = subset.set_index(pd.to_datetime(subset["starttime"]))
@@ -337,7 +362,7 @@ def create_spectrogram(
     fig, ax = plt.subplots(figsize=(14, 7))
     im = ax.pcolormesh(t_days, f_cycles_per_day, power_db, shading='gouraud', cmap='viridis')
     
-    ax.set_title(f"Spectrogram (STFT) — {price_area.upper()} {production_group.capitalize()}", fontsize=16)
+    ax.set_title(f"Spectrogram (STFT) — {pricearea.upper()} {productiongroup.capitalize()}", fontsize=16)
     ax.set_xlabel("Time [days]", fontsize=12)
     ax.set_ylabel("Frequency [cycles/day]", fontsize=12)
     

@@ -38,7 +38,7 @@ with st.sidebar:
     render_app_state_controls()
 
 # --- 2. ACCESS GLOBAL STATE ---
-selected_area = st.session_state.get('price_area')
+selected_area = st.session_state.get('pricearea')
 
 if not selected_area:
     st.info("The global Price Area selector is not yet initialized. Please use the sidebar.")

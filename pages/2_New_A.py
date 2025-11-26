@@ -12,11 +12,11 @@ with st.sidebar:
 
 # --- 2. ACCESS GLOBAL STATE ---
 # Read the globally selected price area and groups from session_state
-price_area = st.session_state.get("price_area")
-globally_selected_groups = st.session_state.get("production_group")
+pricearea = st.session_state.get("pricearea")
+globally_selected_groups = st.session_state.get("productiongroup")
 
 # --- INITIAL CHECK ---
-if not price_area or not globally_selected_groups:
+if not pricearea or not globally_selected_groups:
     st.info("Please use the sidebar to select a Price Area and at least one Production Group.")
     st.stop()
 
@@ -43,7 +43,7 @@ st.info(
     f"""
     **Analysis Scope** (by the sidebar configuartion):
     
-    * **Price Area:** **{price_area}**
+    * **Price Area:** **{pricearea}**
     * **Available Groups:** {groups_text}
     """
 )
@@ -65,7 +65,7 @@ tab1, tab2 = st.tabs(["STL Decomposition", "Spectrogram"])
 
 # TAB 1: STL Decomposition
 with tab1:
-    st.markdown(f"#### STL Decomposition: {selected_group_for_analysis.capitalize()} in {price_area}")
+    st.markdown(f"#### STL Decomposition: {selected_group_for_analysis.capitalize()} in {pricearea}")
     
     col_period, col_seasonal, col_trend = st.columns(3)
     with col_period:
@@ -79,8 +79,8 @@ with tab1:
     try:
         fig_stl = functions.stl_decomposition_elhub(
             df_production,
-            price_area=price_area, 
-            production_group=selected_group_for_analysis,
+            pricearea=pricearea, 
+            productiongroup=selected_group_for_analysis,
             period=period,
             seasonal=seasonal,
             trend=trend
@@ -92,7 +92,7 @@ with tab1:
 
 # TAB 2: Spectrogram Analysis
 with tab2:
-    st.markdown(f"#### Spectrogram Analysis: {selected_group_for_analysis.capitalize()} in {price_area}")
+    st.markdown(f"#### Spectrogram Analysis: {selected_group_for_analysis.capitalize()} in {pricearea}")
     
     col_window, col_overlap = st.columns(2)
     with col_window:
@@ -105,8 +105,8 @@ with tab2:
     try:
         fig_spec = functions.create_spectrogram( 
             df_production, 
-            price_area=price_area, 
-            production_group=selected_group_for_analysis,
+            pricearea=pricearea, 
+            productiongroup=selected_group_for_analysis,
             window_length=window_length,
             overlap=overlap
         )

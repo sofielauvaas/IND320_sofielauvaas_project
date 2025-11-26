@@ -18,7 +18,7 @@ with st.sidebar:
 # --- 2. ACCESS GLOBAL STATE AND DATA FETCHING ---
 
 # Use the canonical key for the Price Area
-selected_area = st.session_state.get('price_area')
+selected_area = st.session_state.get('pricearea')
 
 if not selected_area:
     st.info("The global Price Area selector is not yet initialized. Please use the sidebar.")

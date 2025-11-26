@@ -15,7 +15,7 @@ with st.sidebar:
 
 # --- 2. ACCESS GLOBAL STATE ---
 # Get the globally selected area (used for weather data source)
-selected_area = st.session_state.get('price_area')
+selected_area = st.session_state.get('pricearea')
 
 
 # --- INITIAL CHECKS ---
