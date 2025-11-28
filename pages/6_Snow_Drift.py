@@ -65,6 +65,10 @@ st.markdown("Calculates potential snow transport ($$Q_t$$) based on wind speed, 
 selected_coords = st.session_state.get("last_clicked")
 selected_area_id = st.session_state.get("selected_area")
 
+if not selected_coords or selected_area_id is None:
+    st.warning("No map location selected yet. Please go to the **Map** page and click a location.")
+    st.stop()
+
 # 1.1 Sidebar Control Setup 
 with st.sidebar:
     render_app_state_controls() 
