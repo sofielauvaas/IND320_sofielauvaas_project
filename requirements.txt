@@ -7,6 +7,7 @@ matplotlib
 scipy
 statsmodels
 scikit-learn
+folium
 
 # Pinning these networking libraries for stability
 requests>=2.31.0
