@@ -9,6 +9,7 @@ statsmodels
 scikit-learn
 folium
 streamlit-folium
+shapely
 
 # Pinning these networking libraries for stability
 requests>=2.31.0
