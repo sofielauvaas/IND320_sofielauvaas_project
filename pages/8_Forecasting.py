@@ -82,7 +82,7 @@ for df in [prod_df, cons_df]:
         df.sort_index(inplace=True)
 
 # User selection sidebar
-kind = st.sidebar.radio("Dataset", ["production", "consumption"])
+kind = st.radio("Dataset", ["production", "consumption"])
 
 selected_df = prod_df if kind == "production" else cons_df
 series, meta = select_series(selected_df, kind)
