@@ -5,8 +5,7 @@ st.markdown("""
 Welcome to my IND320 project app. This application analyzes **Elhub power production data** 
 and **Open-Meteo weather data** for Norway.
 
-There is an app state control containing adjustable parameters, which are set on the **first data page**, 
-and are then maintained and accessible globally via the **sidebar** on all later analysis pages.
+There is an app state control containing adjustable parameters, which is accessible globally via the **sidebar** on analysis pages.
 
 Use the sidebar navigation to explore the different analyses.
 """)
